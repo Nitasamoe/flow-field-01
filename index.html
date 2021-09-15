@@ -1,0 +1,205 @@
+
+<html>
+    
+  <head>
+    <script src="../../genArtLib/genArtLib.js"></script>
+    <style type="text/css"> html{background-color: white;}body{margin: 0; padding: 0;}canvas{padding: 0; margin: auto; display: block; position: absolute; top: 0; bottom: 0; left: 0; right: 0;}</style>
+  </head>
+
+  <body>
+    <canvas id="canvas"></canvas>
+
+
+    <script>
+      var canvas = document.getElementById('canvas')
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      const ctx = canvas.getContext('2d');
+      let D = new Drawing_Library(ctx)
+      let U = new Utils()
+      console.log(D)
+      let flowPoints = [];
+      let dist = parseInt(canvas.width * 0.05);
+      let ptsX = parseInt(canvas.height / dist);
+      let ptsY = parseInt(canvas.width / dist);
+      let default_angle = Math.PI * 0.25;
+
+      for(let i = 0; i < ptsY; i++) {
+        if(flowPoints[i]==undefined) {
+          flowPoints[i] = []
+        }
+        for(let j = 0; j < ptsX; j++) {
+          if(flowPoints[i][j]==undefined) {
+          flowPoints[i][j] = []
+          }
+          let pt = new Point(i*dist, j*dist)
+          let scF = 0.09;
+          let noise_v = n(j*scF,i*scF)
+          pt.angle = U.remap(noise_v, 0, 1, 0, 2*Math.PI);
+          flowPoints[i][j].push(pt)
+
+          //new D.Polygon(4,5,pt).fill()
+          // ctx.save();
+          // ctx.translate(pt.x, pt.y);
+          // ctx.rotate(pt.angle);
+          // ctx.beginPath();
+          // ctx.moveTo(0, 0);
+          // ctx.lineTo(20, 0);
+          // ctx.stroke();
+
+          // ctx.restore();
+        }
+      }
+
+      let startPoints = []
+
+      // for(let i = 0; i<30000; i++) {
+      //   y = U.remap(Math.random(),0,1,200,window.innerWidth-200)
+      //   x = U.remap(Math.random(),0,1,200,window.innerHeight-200)
+      //   startPoints.push(new Point(x,y))
+      // }
+
+
+      let distPos = 50;
+      let ptsXPos = parseInt(canvas.height / distPos);
+      let ptsYPos = parseInt(canvas.width / distPos);
+      for(let i = 0; i <= ptsYPos; i++) {
+        for(let j = 0; j <= ptsXPos; j++) {
+          startPoints.push(new Point(i*distPos,j*distPos))
+        }
+      }
+
+      // for(let i = 0; i<1000; i++) {
+      //   y = U.remap(Math.random(),0,1,0,window.innerWidth)
+      //   x = U.remap(Math.random(),0,1,0,window.innerHeight)
+      //   startPoints.push(new Point(x,y))
+      // }
+
+      startPoints
+        .map(Pt => {
+          return makeCurveOverFlowField(flowPoints, Pt, 50, 9)
+        })
+        .map(curve => {
+          return curve
+          let sub = curve[0].subtractPoint(curve[curve.length-1])
+          let dirVector = new DirVector(sub.x, sub.y).getUnitVector()
+          return curve.concat([...curve.map(pt => pt.addPoint(dirVector.getNormalVector().multiplyVectorByNumber(2))).reverse()])
+          //return curve.concat(curve.reverse())
+        })
+        .map((curve,i) => {
+          //bzCurve(curve)
+          //D.outlineFromPoints(curve, "black",false)
+          curve.map((pt,i)=> {
+            if(i===0 || i%3===0){
+              if(curve[i] && curve[i+1] && curve[i+2] && curve[i+3])
+              makeBezierCurve(ctx, curve[i], curve[i+1], curve[i+2], curve[i+3])
+            }
+          })
+        })
+
+
+
+
+      function makeBezierCurve(canvas,p1,c1,c2,p2) {
+        if(false) {
+          new D.Polygon(4,5,p1).fill("red");
+          new D.Polygon(4,5,p2).fill("red");
+          new D.Polygon(4,5,c1).fill("red");
+          new D.Polygon(4,5,c2).fill("red");
+        }
+        canvas.moveTo(p1.x, p1.y);
+        canvas.bezierCurveTo(c1.x,c1.y, c2.x, c2.y, p2.x,p2.y);
+        canvas.stroke()
+      }
+        
+
+      function makeCurveOverFlowField(flowField, startPoint, step_length, num_steps) {
+        let finalPtArray = []
+        for(let i = 0; i < num_steps; i++) {
+          finalPtArray.push(startPoint)
+          //new D.Polygon(4,5,startPoint).fill("red");
+          let x_offset = startPoint.x;
+          let y_offset = startPoint.y;
+
+          let column_index = parseInt(x_offset / dist)
+          let row_index = parseInt(y_offset / dist)
+
+          if(flowField[column_index] && flowField[column_index][row_index]) {
+            let pt = flowField[column_index][row_index][0]
+            let grid_angle = pt.angle
+            //new D.Polygon(4,5,pt).fill("blue");
+
+            let x_step = step_length * Math.cos(grid_angle)
+            let y_step = step_length * Math.sin(grid_angle)
+
+            startPoint = new Point(
+              startPoint.x + x_step,
+              startPoint.y + y_step)
+          }
+          
+        }
+
+      return finalPtArray
+    }
+
+    function gradient(a, b) {
+            return (b.y-a.y)/(b.x-a.x);
+        }
+
+    function bzCurve(points, f, t) {
+            if (typeof(f) == 'undefined') f = 0.3;
+            if (typeof(t) == 'undefined') t = 0.6;
+          
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+          
+            var m = 0;
+            var dx1 = 0;
+            var dy1 = 0;
+      
+            var preP = points[0];
+      
+            for (var i = 1; i < points.length; i++) {
+                var curP = points[i];
+                nexP = points[i + 1];
+                if (nexP) {
+                    m = gradient(preP, nexP);
+                    dx2 = (nexP.x - curP.x) * -f;
+                    dy2 = dx2 * m * t;
+                } else {
+                    dx2 = 0;
+                    dy2 = 0;
+                }
+                  
+                ctx.bezierCurveTo(
+                    preP.x - dx1, preP.y - dy1,
+                    curP.x + dx2, curP.y + dy2,
+                    curP.x, curP.y
+                );
+              
+                dx1 = dx2;
+                dy1 = dy2;
+                preP = curP;
+            }
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+      // D.fillromPoints(finalPtArray.concat(mirrorCurve),"red")
+
+  //   // move to the first point
+  // function makeCurveThrough(array)
+  //  ctx.moveTo(points[0].x, points[0].y);
+
+  // for (i = 1; i < points.length - 2; i ++)
+  // {
+  //   var xc = (points[i].x + points[i + 1].x) / 2;
+  //   var yc = (points[i].y + points[i + 1].y) / 2;
+  //   ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+  // }
+  // // curve through the last two points
+  // ctx.quadraticCurveTo(points[i].x, points[i].y, points[i+1].x,points[i+1].y);
+      
+    </script>
+  </body>
+</html>
